@@ -162,7 +162,7 @@ module Delayed
       Delayed::Job.find_each do |job|
         pid = job.locked_by.match(/(?:pid\:)(\d+)/).to_a.last.to_i
         unless is_process_running?(pid)
-          say job.last_error = "Worker process crashed"
+          say job.last_error = "* [JOB] Worker process crashed #{job.locked_by}, recovering job..."
           job.save
           
           if job.payload_object.respond_to? :recover
