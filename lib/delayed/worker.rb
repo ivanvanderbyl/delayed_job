@@ -48,8 +48,10 @@ module Delayed
       @quiet = options[:quiet]
       self.class.min_priority = options[:min_priority] if options.has_key?(:min_priority)
       self.class.max_priority = options[:max_priority] if options.has_key?(:max_priority)
+      
+      recover_crashed_jobs!
     end
-
+    
     # Every worker has a unique name which by default is the pid of the process. There are some
     # advantages to overriding this with something which survives worker retarts:  Workers can#
     # safely resume working on tasks which are locked by themselves. The worker will assume that
@@ -70,7 +72,9 @@ module Delayed
 
       trap('TERM') { say 'Exiting...'; $exit = true }
       trap('INT')  { say 'Exiting...'; $exit = true }
-
+      
+      recover_crashed_jobs!
+      
       loop do
         result = nil
 
