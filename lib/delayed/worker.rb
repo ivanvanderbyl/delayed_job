@@ -68,7 +68,9 @@ module Delayed
 
       trap('TERM') { say 'Exiting...'; $exit = true }
       trap('INT')  { say 'Exiting...'; $exit = true }
-
+      
+      recover_crashed_jobs!
+      
       loop do
         result = nil
 
@@ -150,6 +152,26 @@ module Delayed
     end
 
   protected
+    
+    # Finds locked jobs in database, then checks if the process IDs exist, if not, triggers a restart.
+    def recover_crashed_jobs!
+      Delayed::Job.find_each do |job|
+        pid = job.locked_by.match(/(?:pid\:)(\d+)/).to_a.last.to_i
+        unless is_process_running?(pid)
+          say job.last_error = "Worker process crashed"
+          job.save
+        end
+      end
+    end
+    
+    def is_process_running?(pid)
+      begin
+        Process.getpgid( pid )
+        true
+      rescue Errno::ESRCH
+        false
+      end
+    end
     
     def handle_failed_job(job, error)
       job.last_error = error.message + "\n" + error.backtrace.join("\n")
