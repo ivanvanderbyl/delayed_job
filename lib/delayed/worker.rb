@@ -163,7 +163,7 @@ module Delayed
         pid = job.locked_by.match(/(?:pid\:)(\d+)/).to_a.last.to_i
         host_name = job.locked_by..match(/(?:host\:)(.+)(?: pid\:\d+)/).to_a.last
         
-        unless is_process_running?(pid) && Socket.gethostname != host_name
+        if !is_process_running?(pid) && Socket.gethostname == host_name
           say job.last_error = "* [JOB] Worker process crashed #{job.locked_by}, recovering job..."
           job.save
           
