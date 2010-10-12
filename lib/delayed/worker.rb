@@ -48,8 +48,6 @@ module Delayed
       @quiet = options[:quiet]
       self.class.min_priority = options[:min_priority] if options.has_key?(:min_priority)
       self.class.max_priority = options[:max_priority] if options.has_key?(:max_priority)
-      
-      recover_crashed_jobs!
     end
     
     # Every worker has a unique name which by default is the pid of the process. There are some
@@ -159,13 +157,21 @@ module Delayed
 
   protected
     
-    # Finds locked jobs in database, then checks if the process IDs exist, if not, triggers a restart.
+    # Finds locked jobs in database, then checks if the process IDs exist, if not, triggers recovery action.
     def recover_crashed_jobs!
       Delayed::Job.find_each do |job|
         pid = job.locked_by.match(/(?:pid\:)(\d+)/).to_a.last.to_i
         unless is_process_running?(pid)
           say job.last_error = "Worker process crashed"
           job.save
+          
+          if job.payload_object.respond_to? :recover
+            say "* [JOB] Running recover hook"
+            job.payload_object.recover
+          end
+          
+          reschedule(job)
+          
         end
       end
     end
