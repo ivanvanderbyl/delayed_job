@@ -160,20 +160,22 @@ module Delayed
     # Finds locked jobs in database, then checks if the process IDs exist, if not, triggers recovery action.
     def recover_crashed_jobs!
       Delayed::Job.find_each do |job|
-        pid = job.locked_by.match(/(?:pid\:)(\d+)/).to_a.last.to_i
-        host_name = job.locked_by.match(/(?:host\:)(.+)(?: pid\:\d+)/).to_a.last
+        if job.locked_by
+          pid = job.locked_by.match(/(?:pid\:)(\d+)/).to_a.last.to_i
+          host_name = job.locked_by.match(/(?:host\:)(.+)(?: pid\:\d+)/).to_a.last
         
-        if !is_process_running?(pid) && Socket.gethostname == host_name
-          say job.last_error = "* [JOB] Worker process crashed #{job.locked_by}, recovering job..."
-          job.save
+          if !is_process_running?(pid) && Socket.gethostname == host_name
+            say job.last_error = "* [JOB] Worker process crashed #{job.locked_by}, recovering job..."
+            job.save
           
-          if job.payload_object.respond_to? :recover
-            say "* [JOB] Running recover hook"
-            job.payload_object.recover
+            if job.payload_object.respond_to? :recover
+              say "* [JOB] Running recover hook"
+              job.payload_object.recover
+            end
+          
+            reschedule(job)
+          
           end
-          
-          reschedule(job)
-          
         end
       end
     rescue => e
